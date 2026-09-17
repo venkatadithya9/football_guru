@@ -11,8 +11,8 @@ from langgraph.store.memory import InMemoryStore
 from langgraph.graph.message import AnyMessage, add_messages
 from langgraph.managed.is_last_step import RemainingSteps
 
-from langchain.mcp import MCPAdapter
-from mcp.server import MCPServer
+from fastmcp import FastMCP
+# from mcp.server import MCPServer
 import httpx2
 
 class InputState(TypedDict):
@@ -63,7 +63,7 @@ async def make_request(url: str) -> dict:
 
 # --------- MCP DEFINITION --------------
 
-mcp = MCPServer("football_data_server")
+mcp = FastMCP("football_data_server")
 
 @mcp.tool()
 async def get_league_standings(league: str) -> str:
