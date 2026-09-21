@@ -1,0 +1,2 @@
+[console_scripts]
+football-mcp = football_mcp.cli:main

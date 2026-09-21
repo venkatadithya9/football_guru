@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "football-mcp"
+version = "0.1.0"
+description = "FastMCP server layer for API-Football v3 with local SQLite caching, rate-limiting, and player stats aggregation."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Venkat Adithya" }
+]
+dependencies = [
+    "fastmcp>=4.0.0",
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0"
+]
+
+[project.scripts]
+football-mcp = "football_mcp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["football_mcp*"]

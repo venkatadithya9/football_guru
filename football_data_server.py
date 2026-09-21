@@ -91,4 +91,11 @@ async def get_league_standings(league: str) -> str:
 
 
 
-
+if __name__ == "__main__":
+    # Initiate the HTTP transport server
+    mcp.run(
+        transport="http", 
+        host="0.0.0.0",  # Listen on all network interfaces (use 127.0.0.1 for local only)
+        port=8000,       # The port you want to expose
+        path="/mcp"      # Optional: Custom endpoint path (defaults to /mcp)
+    )
