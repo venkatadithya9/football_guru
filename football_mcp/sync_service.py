@@ -67,14 +67,11 @@ class SyncService:
         # Check if already cached
         cached = self.db.get_standings(league.id, season)
         if cached and not force:
-            if season < SIMULATED_CURRENT_SEASON or self.db.is_season_completed(league.id, season):
-                logger.info(f"Season {season} for {league.name} is completed. Using frozen cached standings.")
-                return cached
-            # If current season and already cached, return unless forced
+            logger.info(f"⚡ [CACHE HIT] Standings for {league.name} ({season}) loaded from local SQLite (0 API calls)")
             return cached
 
         # Otherwise fetch from API
-        logger.info(f"Fetching standings from API for {league.name} ({season})...")
+        logger.info(f"🔄 [CACHE REFRESH] Fetching standings from API-Football for {league.name} ({season})...")
         response_data = self.api_client.get_standings(league.id, season)
         if not response_data:
             logger.warning(f"No standings returned from API for {league.name} ({season}).")

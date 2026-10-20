@@ -54,6 +54,7 @@ sync_service = SyncService(db=db, api_client=api_client)
 @mcp.resource("football://status/quota")
 def resource_quota_status() -> str:
     """Resource returning current API quota and rate-limit status."""
+    logger.info("📦 [RESOURCE READ] football://status/quota")
     status = api_client.get_quota_status()
     return json.dumps(status, indent=2)
 
@@ -64,8 +65,10 @@ def resource_standings(league: str, season: str) -> str:
     Resource providing the full league standings table.
     Reads from local SQLite database (0 API calls if already cached).
     """
+    logger.info(f"📦 [RESOURCE READ] football://standings/{league}/{season}")
     league_info = resolve_league(league)
     if not league_info:
+        logger.warning(f"   ↳ Unknown league: {league}")
         return json.dumps({"error": f"Unknown league: {league}. Available: pl, laliga, bundesliga, serie_a, ligue1"})
 
     try:
@@ -74,6 +77,7 @@ def resource_standings(league: str, season: str) -> str:
         season_int = SIMULATED_CURRENT_SEASON
 
     standings = sync_service.sync_standings(league_info.id, season_int)
+    logger.info(f"   ↳ Returned {len(standings)} teams in standings for {league_info.name} ({season_int})")
     if not standings:
         return json.dumps({
             "league": league_info.name,
@@ -113,8 +117,10 @@ def resource_league_teams(league: str, season: str) -> str:
     """
     Resource providing overview of all teams in a league for a given season.
     """
+    logger.info(f"📦 [RESOURCE READ] football://teams/{league}/{season}")
     league_info = resolve_league(league)
     if not league_info:
+        logger.warning(f"   ↳ Unknown league: {league}")
         return json.dumps({"error": f"Unknown league: {league}"})
 
     try:
@@ -126,12 +132,14 @@ def resource_league_teams(league: str, season: str) -> str:
     if not teams_stats:
         # Fallback to team directory
         teams = db.get_teams_by_league(league_info.id)
+        logger.info(f"   ↳ Returning directory of {len(teams)} teams for {league_info.name}")
         return json.dumps({
             "league": league_info.name,
             "season": season_int,
             "teams": teams,
         }, indent=2)
 
+    logger.info(f"   ↳ Returning statistics for {len(teams_stats)} teams in {league_info.name} ({season_int})")
     return json.dumps({
         "league": league_info.name,
         "season": season_int,
@@ -145,20 +153,24 @@ def resource_team_statistics(team_id: str, season: str) -> str:
     """
     Resource providing comprehensive statistics for a specific team.
     """
+    logger.info(f"📦 [RESOURCE READ] football://teams/{team_id}/statistics/{season}")
     try:
         t_id = int(team_id)
         season_int = int(season)
     except ValueError:
+        logger.warning(f"   ↳ Invalid team_id ({team_id}) or season ({season})")
         return json.dumps({"error": "Invalid team_id or season format"})
 
     stats = db.get_team_statistics(t_id, season_int)
     if not stats:
+        logger.info(f"   ↳ No cached statistics found for team {t_id} ({season_int})")
         return json.dumps({
             "team_id": t_id,
             "season": season_int,
             "message": "No statistics cached for this team. Use sync_league_data to fetch.",
         }, indent=2)
 
+    logger.info(f"   ↳ Returned statistics for team '{stats.get('team_name', t_id)}' ({season_int})")
     return json.dumps(stats, indent=2)
 
 
@@ -167,8 +179,10 @@ def resource_league_players(league: str, season: str) -> str:
     """
     Resource providing top player statistics and leaderboards for a league.
     """
+    logger.info(f"📦 [RESOURCE READ] football://players/{league}/{season}")
     league_info = resolve_league(league)
     if not league_info:
+        logger.warning(f"   ↳ Unknown league: {league}")
         return json.dumps({"error": f"Unknown league: {league}"})
 
     try:
@@ -182,9 +196,11 @@ def resource_league_players(league: str, season: str) -> str:
 
     if not top_scorers and not top_assists:
         # Attempt sync if not cached
+        logger.info(f"   ↳ No cached player leaders for {league_info.name} ({season_int}). Triggering sync...")
         top_scorers = sync_service.sync_player_leaders(league_info.id, season_int)
         top_assists = db.get_league_players_leaderboard(league_info.id, season_int, sort_by="assists", limit=15)
 
+    logger.info(f"   ↳ Returned {len(top_scorers)} scorers and {len(top_assists)} playmakers for {league_info.name}")
     return json.dumps({
         "league": league_info.name,
         "season": season_int,
@@ -198,6 +214,7 @@ def resource_team_roster(team_id: str, season: str) -> str:
     """
     Resource providing player statistics for a specific team roster.
     """
+    logger.info(f"📦 [RESOURCE READ] football://players/{team_id}/roster/{season}")
     try:
         t_id = int(team_id)
         season_int = int(season)
@@ -205,6 +222,7 @@ def resource_team_roster(team_id: str, season: str) -> str:
         return json.dumps({"error": "Invalid team_id or season format"})
 
     roster = db.get_team_players(t_id, season_int)
+    logger.info(f"   ↳ Returned {len(roster)} players for team {t_id} ({season_int})")
     return json.dumps({
         "team_id": t_id,
         "season": season_int,
@@ -218,6 +236,7 @@ def resource_season_summary(season: str) -> str:
     """
     Resource summarizing the top 5 leagues for a given season.
     """
+    logger.info(f"📦 [RESOURCE READ] football://seasons/summary/{season}")
     try:
         season_int = int(season)
     except ValueError:
@@ -254,6 +273,7 @@ def get_live_scores(leagues: Optional[List[str]] = None) -> str:
         leagues: Optional list of league keys or aliases to filter (e.g. ['pl', 'laliga']).
                  If omitted, checks active matches across all top 5 European leagues.
     """
+    logger.info(f"🔧 [TOOL CALL] get_live_scores | leagues={leagues}")
     league_ids: List[int] = []
     if leagues:
         for l in leagues:
@@ -266,6 +286,7 @@ def get_live_scores(leagues: Optional[List[str]] = None) -> str:
     try:
         fixtures = api_client.get_live_fixtures(league_ids=league_ids)
         if not fixtures:
+            logger.info("   ↳ No live matches currently in progress")
             return "No live matches are currently in progress in the specified leagues."
 
         output = []
@@ -288,6 +309,7 @@ def get_live_scores(leagues: Optional[List[str]] = None) -> str:
                 f"({elapsed}', {short_status})"
             )
 
+        logger.info(f"   ↳ Returning {len(fixtures)} live matches")
         return "\n".join(output)
 
     except Exception as e:
@@ -304,6 +326,7 @@ def get_fixtures_by_date(date: str, league: Optional[str] = None) -> str:
         date: Target date in format YYYY-MM-DD (e.g. '2026-09-20').
         league: Optional league key or alias (e.g. 'pl', 'laliga').
     """
+    logger.info(f"🔧 [TOOL CALL] get_fixtures_by_date | date='{date}', league='{league}'")
     league_id = None
     if league:
         linfo = resolve_league(league)
@@ -313,6 +336,7 @@ def get_fixtures_by_date(date: str, league: Optional[str] = None) -> str:
     try:
         fixtures = api_client.get_fixtures_by_date(date_str=date, league_id=league_id)
         if not fixtures:
+            logger.info(f"   ↳ No fixtures found for date: {date}")
             return f"No fixtures found for date: {date}"
 
         lines = [f"Fixtures for {date}:"]
@@ -328,6 +352,7 @@ def get_fixtures_by_date(date: str, league: Optional[str] = None) -> str:
 
             lines.append(f"- [{league_name}] {home} {hg} - {ag} {away} ({status})")
 
+        logger.info(f"   ↳ Returning {len(fixtures)} fixtures for {date}")
         return "\n".join(lines)
     except Exception as e:
         return f"Error retrieving fixtures: {e}"
@@ -343,8 +368,10 @@ def get_league_standings(league: str, season: int = SIMULATED_CURRENT_SEASON) ->
         league: League name, short key or alias (e.g. 'pl', 'laliga', 'bundesliga', 'serie_a', 'ligue1').
         season: Season year (defaults to 2024).
     """
+    logger.info(f"🔧 [TOOL CALL] get_league_standings | league='{league}', season={season}")
     linfo = resolve_league(league)
     if not linfo:
+        logger.warning(f"   ↳ Unknown league: '{league}'")
         return f"Unknown league '{league}'. Available: pl, laliga, bundesliga, serie_a, ligue1."
 
     standings = sync_service.sync_standings(linfo.id, season)
@@ -362,6 +389,7 @@ def get_league_standings(league: str, season: int = SIMULATED_CURRENT_SEASON) ->
             f"{r['lose']:<3} {gd:<4} {r['points']:<4} {r['form']}"
         )
 
+    logger.info(f"   ↳ Served standings table for {linfo.name} ({len(standings)} clubs)")
     return header + "\n".join(lines)
 
 
@@ -375,8 +403,10 @@ def get_team_statistics(league: str, team_name_or_id: str, season: int = SIMULAT
         team_name_or_id: Team name (e.g. 'Arsenal') or team ID.
         season: Season year (default: 2024).
     """
+    logger.info(f"🔧 [TOOL CALL] get_team_statistics | league='{league}', team='{team_name_or_id}', season={season}")
     linfo = resolve_league(league)
     if not linfo:
+        logger.warning(f"   ↳ Unknown league: '{league}'")
         return f"Unknown league: {league}"
 
     team_id = None
@@ -391,6 +421,7 @@ def get_team_statistics(league: str, team_name_or_id: str, season: int = SIMULAT
                 break
 
     if not team_id:
+        logger.warning(f"   ↳ Team '{team_name_or_id}' not found in {linfo.name}")
         return f"Could not find team '{team_name_or_id}' in {linfo.name}. Sync the standings first to register teams."
 
     stats = sync_service.sync_team_statistics(linfo.id, team_id, season)
@@ -406,6 +437,7 @@ def get_team_statistics(league: str, team_name_or_id: str, season: int = SIMULAT
         f"- Failed to Score: {stats['failed_to_score']}\n"
         f"- Form: {stats['form']}\n"
     )
+    logger.info(f"   ↳ Returned statistics for team '{stats['team_name']}'")
     return summary
 
 
@@ -425,13 +457,16 @@ def get_player_statistics(
         metric: Ranking metric ('goals', 'assists', 'rating', 'tackles', 'cards').
         limit: Max number of players to return (default: 15).
     """
+    logger.info(f"🔧 [TOOL CALL] get_player_statistics | league='{league}', season={season}, metric='{metric}', limit={limit}")
     linfo = resolve_league(league)
     if not linfo:
+        logger.warning(f"   ↳ Unknown league: '{league}'")
         return f"Unknown league: {league}"
 
     players = db.get_league_players_leaderboard(linfo.id, season, sort_by=metric, limit=limit)
     if not players:
         # Attempt sync
+        logger.info(f"   ↳ Cache empty for {linfo.name} players ({season}). Syncing player leaders...")
         sync_service.sync_player_leaders(linfo.id, season)
         players = db.get_league_players_leaderboard(linfo.id, season, sort_by=metric, limit=limit)
 
@@ -445,6 +480,7 @@ def get_player_statistics(
             f"Goals: {p['goals']}, Assists: {p['assists']}, Mins: {p['minutes']}, Rating: {p['rating'] or 'N/A'}"
         )
 
+    logger.info(f"   ↳ Returning {len(players)} players ranked by {metric} for {linfo.name}")
     return "\n".join(lines)
 
 
@@ -465,12 +501,14 @@ def sync_league_data(
         sync_players: Whether to also fetch top scorers & assists (2 API calls).
         force: Force refresh even if cached.
     """
+    logger.info(f"🔧 [TOOL CALL] sync_league_data | league='{league}', season={season}, sync_players={sync_players}, force={force}")
     linfo = resolve_league(league)
     if not linfo:
         return f"Unknown league: {league}"
 
     quota_before = api_client.get_quota_status()
     if not quota_before["can_make_request"] and not force:
+        logger.warning(f"   ↳ Sync blocked by quota guard: {quota_before['requests_remaining']} remaining")
         return (
             f"Sync aborted: Only {quota_before['requests_remaining']} requests remaining today. "
             f"Safety limit is {quota_before['safety_threshold']}."
@@ -488,6 +526,7 @@ def sync_league_data(
 
     quota_after = api_client.get_quota_status()
     results.append(f"Remaining daily quota: {quota_after['requests_remaining']}")
+    logger.info(f"   ↳ Sync complete: {len(standings)} teams, quota remaining: {quota_after['requests_remaining']}")
 
     return f"Successfully synced {linfo.name} ({season}):\n" + "\n".join(f"- {r}" for r in results)
 
@@ -497,7 +536,9 @@ def check_api_quota() -> str:
     """
     Check current API-Football quota usage, remaining requests, and rate-limit guard status.
     """
+    logger.info("🔧 [TOOL CALL] check_api_quota")
     status = api_client.get_quota_status()
+    logger.info(f"   ↳ Quota: {status['requests_remaining']}/{status['max_daily_quota']} remaining (used today: {status['requests_made_today']})")
     return (
         f"=== API-Football Quota Status ===\n"
         f"- Requests Made Today: {status['requests_made_today']}\n"
@@ -506,3 +547,6 @@ def check_api_quota() -> str:
         f"- Safe to Make Request: {'YES' if status['can_make_request'] else 'NO (Safety Triggered)'}\n"
         f"- Minute Rate Limit: {status['rate_limit_per_minute']} req/min\n"
     )
+
+if __name__ == "__main__":
+    mcp.run(transport="http", host="localhost", port=8000)

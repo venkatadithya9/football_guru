@@ -3,7 +3,7 @@ Model Initialization File
 
 Configures the LLM model used throughout the workshop notebook.
 
-Default: Google Gemini (gemini-3.1-flash-lite).
+Default: Google Gemini (gemini-3.8-flash).
 
 To swap providers:
   1. Comment out the Default Models section below.
@@ -29,7 +29,7 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 model = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite", google_api_key=os.getenv("GEMINI_API_KEY")
+    model="gemini-3.8-flash", google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
 
@@ -86,7 +86,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 
 model = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite", google_api_key=os.getenv("GEMINI_API_KEY")
+    model="gemini-3.8-flash", google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
 

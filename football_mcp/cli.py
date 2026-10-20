@@ -14,8 +14,10 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # 'run' command: start the FastMCP server
-    run_parser = subparsers.add_parser("run", help="Start the FastMCP server via stdio")
-    run_parser.add_argument("--transport", default="stdio", choices=["stdio", "sse"], help="Transport protocol")
+    run_parser = subparsers.add_parser("run", help="Start the FastMCP server")
+    run_parser.add_argument("--transport", default="stdio", choices=["stdio", "sse", "http", "streamable-http"], help="Transport protocol")
+    run_parser.add_argument("--host", default="127.0.0.1", help="Host address for HTTP/SSE (default: 127.0.0.1)")
+    run_parser.add_argument("--port", type=int, default=8000, help="Port for HTTP/SSE (default: 8000)")
 
     # 'quota' command: check API quota
     subparsers.add_parser("quota", help="Check current API quota usage")
@@ -34,13 +36,26 @@ def main():
 
     args = parser.parse_args()
 
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+    )
+
     db = FootballDatabase()
     api_client = RateLimitedApiClient(db=db)
     sync_service = SyncService(db=db, api_client=api_client)
 
     if args.command == "run" or args.command is None:
-        print("Starting Football MCP Server (FastMCP)...", file=sys.stderr)
-        mcp.run()
+        transport = getattr(args, "transport", "stdio")
+        logger = logging.getLogger("football_mcp")
+        logger.info(f"Starting Football MCP Server (FastMCP) with transport={transport} on {getattr(args, 'host', '127.0.0.1')}:{getattr(args, 'port', 8000)}...")
+        if transport in ["http", "sse", "streamable-http"]:
+            mcp.run(transport=transport, host=args.host, port=args.port)
+        else:
+            mcp.run(transport="stdio")
 
     elif args.command == "quota":
         q = api_client.get_quota_status()

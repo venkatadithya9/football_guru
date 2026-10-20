@@ -133,6 +133,7 @@ class RateLimitedApiClient:
 
         url = f"{self.base_url}/{endpoint}"
         start_time = time.time()
+        logger.info(f"🌐 [API-Football] GET /{endpoint} | params={params or {}}")
 
         try:
             response = requests.get(url, headers=self.headers, params=params or {}, timeout=15.0)
@@ -148,6 +149,11 @@ class RateLimitedApiClient:
                 status_code=response.status_code,
                 requests_remaining=requests_remaining,
                 response_time_ms=elapsed_ms,
+            )
+
+            logger.info(
+                f"   ↳ HTTP {response.status_code} ({elapsed_ms:.1f}ms) | "
+                f"Quota Remaining: {requests_remaining if requests_remaining is not None else 'N/A'}/100"
             )
 
             response.raise_for_status()
